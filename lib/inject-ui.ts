@@ -88,9 +88,12 @@ export function injectExportBar(cards: Flashcard[], doc: Document = document): b
 
   const existing = doc.getElementById(SATCHEL_ROOT_ID);
   if (existing) {
-    existing.dataset.count = String(cards.length);
+    const nextCount = String(cards.length);
+    const nextStatus = `${cards.length} cards ready`;
     bindActions(existing, cards);
-    setStatus(existing, `${cards.length} cards ready`, 'ok');
+    if (existing.dataset.count !== nextCount) existing.dataset.count = nextCount;
+    const status = existing.querySelector<HTMLElement>('[data-satchel-status]');
+    if (status?.textContent !== nextStatus) setStatus(existing, nextStatus, 'ok');
     return true;
   }
 

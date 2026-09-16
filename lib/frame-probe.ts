@@ -2,17 +2,26 @@ import { SATCHEL_MESSAGE } from './types';
 
 /**
  * Must stay self-contained: Chrome serializes this function into the target frame.
+ * Do not close over module state or helper functions; Chrome copies this body only.
  */
 export function probeAndPost(): boolean {
+  const view = window as Window & { __satchelLastRaw?: string };
   const nodes = document.querySelectorAll('[data-app-data], app-root');
   for (const node of nodes) {
     const data = node.getAttribute('data-app-data');
-    if (!data) continue;
+    if (!data || data === view.__satchelLastRaw) continue;
     try {
-      window.parent.postMessage({ type: 'SATCHEL_NOTEBOOKLM_DATA', data }, '*');
+      (window.top ?? window.parent).postMessage({ type: 'SATCHEL_NOTEBOOKLM_DATA', data }, '*');
+      view.__satchelLastRaw = data;
       return true;
     } catch {
-      // keep scanning
+      try {
+        window.parent.postMessage({ type: 'SATCHEL_NOTEBOOKLM_DATA', data }, '*');
+        view.__satchelLastRaw = data;
+        return true;
+      } catch {
+        // keep scanning
+      }
     }
   }
   return false;

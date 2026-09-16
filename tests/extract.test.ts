@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseAppData } from '../lib/extract';
+import { parseAppData, shouldHandleAppData } from '../lib/extract';
 
 describe('parseAppData', () => {
   it('reads NotebookLM {f,b} flashcards', () => {
@@ -44,5 +44,13 @@ describe('parseAppData', () => {
 
   it('returns null for invalid JSON', () => {
     expect(parseAppData('not-json')).toBeNull();
+  });
+});
+
+describe('shouldHandleAppData', () => {
+  it('skips empty and unchanged payloads', () => {
+    expect(shouldHandleAppData('', '')).toBe(false);
+    expect(shouldHandleAppData('{"flashcards":[]}', '{"flashcards":[]}')).toBe(false);
+    expect(shouldHandleAppData('{"flashcards":[{"f":"Q","b":"A"}]}', '')).toBe(true);
   });
 });

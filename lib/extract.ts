@@ -66,15 +66,27 @@ export function parseAppData(raw: string): ExtractResult | null {
   return { kind: 'flashcards', cards, raw: parsed };
 }
 
-export function extractFromDocument(doc: Document = document): ExtractResult | null {
-  const nodes = doc.querySelectorAll('[data-app-data], app-root');
+export function readAppDataAttribute(
+  root: ParentNode = document,
+): { node: Element; data: string } | null {
+  const nodes = root.querySelectorAll('[data-app-data], app-root');
   for (const node of nodes) {
-    const attr = node.getAttribute('data-app-data');
-    if (!attr) continue;
-    const result = parseAppData(attr);
-    if (result && (result.cards.length > 0 || result.kind === 'quiz')) {
-      return result;
-    }
+    const data = node.getAttribute('data-app-data');
+    if (data) return { node, data };
+  }
+  return null;
+}
+
+export function shouldHandleAppData(raw: string, lastRaw: string): boolean {
+  return raw.length > 0 && raw !== lastRaw;
+}
+
+export function extractFromDocument(doc: Document = document): ExtractResult | null {
+  const found = readAppDataAttribute(doc);
+  if (!found) return null;
+  const result = parseAppData(found.data);
+  if (result && (result.cards.length > 0 || result.kind === 'quiz')) {
+    return result;
   }
   return null;
 }

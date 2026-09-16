@@ -1,19 +1,4 @@
-import { shouldInjectFrame } from '../lib/frame-probe';
-
-function probeAndPost(): boolean {
-  const nodes = document.querySelectorAll('[data-app-data], app-root');
-  for (const node of nodes) {
-    const data = node.getAttribute('data-app-data');
-    if (!data) continue;
-    try {
-      window.parent.postMessage({ type: 'SATCHEL_NOTEBOOKLM_DATA', data }, '*');
-      return true;
-    } catch {
-      // keep scanning
-    }
-  }
-  return false;
-}
+import { probeAndPost, shouldInjectFrame } from '../lib/frame-probe';
 
 async function inject(tabId: number, frameId: number) {
   try {
