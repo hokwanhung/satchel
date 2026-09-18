@@ -15,6 +15,7 @@ stats-*.json
 web-ext.config.ts
 
 # Editor directories and files
+.cursor
 .vscode/*
 !.vscode/extensions.json
 .idea
