@@ -1,7 +1,7 @@
 import { parseAppData, readAppDataAttribute, shouldHandleAppData } from '../lib/extract';
 import { isSatchelMessage } from '../lib/frame-probe';
 import { injectExportBar } from '../lib/inject-ui';
-import type { Flashcard } from '../lib/types';
+import type { ExtractResult } from '../lib/types';
 
 const NOTEBOOK_MATCHES = [
   'https://notebooklm.google.com/*',
@@ -29,7 +29,7 @@ export default defineContentScript({
   runAt: 'document_idle',
   main() {
     const view = window as SatchelWindow;
-    let latestCards: Flashcard[] = [];
+    let latest: ExtractResult | null = null;
     let lastRaw = view.__satchelLastRaw ?? '';
     let settleTimer: number | undefined;
     let dataNodeObserver: MutationObserver | null = null;
@@ -59,11 +59,11 @@ export default defineContentScript({
       });
     };
 
-    const applyCards = (cards: Flashcard[]) => {
-      if (cards.length === 0) return;
-      latestCards = cards;
+    const applyResult = (parsed: ExtractResult) => {
+      if (parsed.cards.length === 0) return;
+      latest = parsed;
       if (window === window.top) {
-        injectExportBar(cards);
+        injectExportBar(parsed.cards, document, parsed.kind);
       }
     };
 
@@ -74,7 +74,7 @@ export default defineContentScript({
       if (!parsed?.cards.length) return;
 
       if (window === window.top) {
-        applyCards(parsed.cards);
+        applyResult(parsed);
         return;
       }
 
@@ -102,14 +102,15 @@ export default defineContentScript({
         lastRaw = event.data.data;
         view.__satchelLastRaw = lastRaw;
         const parsed = parseAppData(event.data.data);
-        if (parsed?.cards.length) applyCards(parsed.cards);
+        if (parsed?.cards.length) applyResult(parsed);
       });
 
       browser.runtime.onMessage.addListener((message) => {
         if (!message || typeof message !== 'object' || !('type' in message)) return;
         if (message.type !== 'SATCHEL_GET_STATUS') return;
         return Promise.resolve({
-          count: latestCards.length,
+          count: latest?.cards.length ?? 0,
+          kind: latest?.kind,
           hasBar: Boolean(document.getElementById('satchel-export-root')),
         });
       });

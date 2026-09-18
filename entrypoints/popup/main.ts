@@ -11,18 +11,19 @@ async function refreshStatus() {
   const onNotebook =
     tab.url.includes('notebook.google.com') || tab.url.includes('notebooklm.google.com');
   if (!onNotebook) {
-    if (status) status.textContent = 'Open NotebookLM, then generate flashcards.';
+    if (status) status.textContent = 'Open NotebookLM, then generate flashcards or a quiz.';
     return;
   }
 
   try {
     const result = (await browser.tabs.sendMessage(tab.id, {
       type: 'SATCHEL_GET_STATUS',
-    })) as { count?: number } | undefined;
+    })) as { count?: number; kind?: string } | undefined;
     if (status) {
+      const noun = result?.kind === 'quiz' ? 'questions' : 'cards';
       status.textContent = result?.count
-        ? `${result.count} cards ready in this notebook.`
-        : 'Flashcards not detected yet. Open the Studio flashcard viewer.';
+        ? `${result.count} ${noun} ready in this notebook.`
+        : 'Nothing detected yet. Open the Studio flashcard or quiz viewer.';
     }
   } catch {
     if (status) status.textContent = 'Reload the NotebookLM tab after installing Satchel.';

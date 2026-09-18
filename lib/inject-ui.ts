@@ -1,5 +1,17 @@
 import { cardsToTsvWithBom, createTsvBlob } from './csv';
-import { SATCHEL_ROOT_ID, type Flashcard } from './types';
+import { SATCHEL_ROOT_ID, type ArtifactKind, type Flashcard } from './types';
+
+function itemNoun(kind: ArtifactKind): string {
+  return kind === 'quiz' ? 'questions' : 'cards';
+}
+
+function downloadName(kind: ArtifactKind): string {
+  return kind === 'quiz' ? 'satchel-quiz.csv' : 'satchel-flashcards.csv';
+}
+
+function readyStatus(count: number, kind: ArtifactKind): string {
+  return `${count} ${itemNoun(kind)} ready`;
+}
 
 const FOOTER_SELECTORS = [
   'artifact-viewer .artifact-footer',
@@ -51,19 +63,19 @@ async function copyText(text: string): Promise<void> {
   }
 }
 
-function downloadCards(cards: Flashcard[]) {
+function downloadCards(cards: Flashcard[], kind: ArtifactKind, doc: Document) {
   const blob = createTsvBlob(cards);
   const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
+  const link = doc.createElement('a');
   link.href = url;
-  link.download = 'satchel-flashcards.csv';
-  document.body.appendChild(link);
+  link.download = downloadName(kind);
+  doc.body.appendChild(link);
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
 }
 
-function bindActions(root: HTMLElement, cards: Flashcard[]) {
+function bindActions(root: HTMLElement, cards: Flashcard[], kind: ArtifactKind, doc: Document) {
   const copyBtn = root.querySelector<HTMLButtonElement>('[data-satchel-copy]');
   const downloadBtn = root.querySelector<HTMLButtonElement>('[data-satchel-download]');
   if (!copyBtn || !downloadBtn) return;
@@ -71,27 +83,32 @@ function bindActions(root: HTMLElement, cards: Flashcard[]) {
   copyBtn.onclick = async () => {
     try {
       await copyText(cardsToTsvWithBom(cards));
-      setStatus(root, `Copied ${cards.length} cards`, 'ok');
+      setStatus(root, `Copied ${cards.length} ${itemNoun(kind)}`, 'ok');
     } catch {
       setStatus(root, 'Copy failed', 'err');
     }
   };
 
   downloadBtn.onclick = () => {
-    downloadCards(cards);
-    setStatus(root, `Downloaded ${cards.length} cards`, 'ok');
+    downloadCards(cards, kind, doc);
+    setStatus(root, `Downloaded ${cards.length} ${itemNoun(kind)}`, 'ok');
   };
 }
 
-export function injectExportBar(cards: Flashcard[], doc: Document = document): boolean {
+export function injectExportBar(
+  cards: Flashcard[],
+  doc: Document = document,
+  kind: ArtifactKind = 'flashcards',
+): boolean {
   if (cards.length === 0) return false;
 
   const existing = doc.getElementById(SATCHEL_ROOT_ID);
   if (existing) {
     const nextCount = String(cards.length);
-    const nextStatus = `${cards.length} cards ready`;
-    bindActions(existing, cards);
+    const nextStatus = readyStatus(cards.length, kind);
+    bindActions(existing, cards, kind, doc);
     if (existing.dataset.count !== nextCount) existing.dataset.count = nextCount;
+    if (existing.dataset.kind !== kind) existing.dataset.kind = kind;
     const status = existing.querySelector<HTMLElement>('[data-satchel-status]');
     if (status?.textContent !== nextStatus) setStatus(existing, nextStatus, 'ok');
     return true;
@@ -104,12 +121,13 @@ export function injectExportBar(cards: Flashcard[], doc: Document = document): b
   const root = doc.createElement('div');
   root.id = SATCHEL_ROOT_ID;
   root.dataset.count = String(cards.length);
+  root.dataset.kind = kind;
   root.innerHTML = `
     <div class="satchel-bar">
       <span class="satchel-brand">Satchel</span>
       <button type="button" data-satchel-copy>Copy CSV</button>
       <button type="button" data-satchel-download>Download CSV</button>
-      <span data-satchel-status>${cards.length} cards ready</span>
+      <span data-satchel-status>${readyStatus(cards.length, kind)}</span>
     </div>
   `;
 
@@ -166,6 +184,6 @@ export function injectExportBar(cards: Flashcard[], doc: Document = document): b
   }
 
   host.appendChild(root);
-  bindActions(root, cards);
+  bindActions(root, cards, kind, doc);
   return true;
 }

@@ -32,14 +32,82 @@ describe('parseAppData', () => {
     expect(result?.cards[0]).toEqual({ front: 'A & B', back: 'ok' });
   });
 
-  it('marks quiz payloads without inventing cards', () => {
+  it('maps quiz options onto Anki front/back rows', () => {
     const result = parseAppData(
       JSON.stringify({
-        quiz: [{ question: 'Q', answerOptions: [{ text: 'A', isCorrect: true }] }],
+        quiz: [
+          {
+            question: 'What is 2+2?',
+            hint: 'Think simple',
+            rationale: 'Addition of two twos.',
+            answerOptions: [
+              { text: '3', isCorrect: false },
+              { text: '4', isCorrect: true },
+            ],
+          },
+        ],
       }),
     );
     expect(result?.kind).toBe('quiz');
-    expect(result?.cards).toEqual([]);
+    expect(result?.cards).toEqual([
+      {
+        front: 'What is 2+2?\nA. 3\nB. 4',
+        back: 'B. 4\n\nAddition of two twos.',
+      },
+    ]);
+  });
+
+  it('accepts quiz aliases and skips empty items', () => {
+    const result = parseAppData(
+      JSON.stringify({
+        questions: [
+          {},
+          {
+            prompt: 'Closest planet?',
+            options: [
+              { t: 'Venus', correct: false },
+              { option: 'Mercury', correct: true },
+            ],
+            explanation: 'Mercury is nearest the Sun.',
+          },
+          {
+            q: 'Two answers',
+            answers: [
+              { text: 'A', isCorrect: true },
+              { text: 'B', isCorrect: true },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(result?.kind).toBe('quiz');
+    expect(result?.cards).toEqual([
+      {
+        front: 'Closest planet?\nA. Venus\nB. Mercury',
+        back: 'B. Mercury\n\nMercury is nearest the Sun.',
+      },
+      {
+        front: 'Two answers\nA. A\nB. B',
+        back: 'A. A\nB. B',
+      },
+    ]);
+  });
+
+  it('keeps quiz kind when items have no correct option', () => {
+    const result = parseAppData(
+      JSON.stringify({
+        quiz: [{ question: 'Q', answerOptions: [{ text: 'A', isCorrect: false }] }],
+      }),
+    );
+    expect(result?.kind).toBe('quiz');
+    expect(result?.cards).toEqual([{ front: 'Q\nA. A', back: '' }]);
+  });
+
+  it('decodes HTML entities in quiz payloads', () => {
+    const result = parseAppData(
+      '{"quiz":[{"question":"A &amp; B","answerOptions":[{"text":"ok","isCorrect":true}]}]}',
+    );
+    expect(result?.cards[0]).toEqual({ front: 'A & B\nA. ok', back: 'A. ok' });
   });
 
   it('returns null for invalid JSON', () => {

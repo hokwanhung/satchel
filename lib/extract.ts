@@ -43,6 +43,70 @@ function parseFlashcards(raw: unknown): Flashcard[] {
   return cards;
 }
 
+function optionLetter(index: number): string {
+  return index < 26 ? String.fromCharCode(65 + index) : String(index + 1);
+}
+
+function parseOptions(record: Record<string, unknown>): { text: string; correct: boolean }[] {
+  const list = Array.isArray(record.answerOptions)
+    ? record.answerOptions
+    : Array.isArray(record.options)
+      ? record.options
+      : Array.isArray(record.answers)
+        ? record.answers
+        : [];
+
+  const options: { text: string; correct: boolean }[] = [];
+  for (const item of list) {
+    const option = asRecord(item);
+    if (!option) continue;
+    const text = stringField(option, 'text', 't', 'option');
+    if (text.length === 0) continue;
+    options.push({
+      text,
+      correct: option.isCorrect === true || option.correct === true,
+    });
+  }
+  return options;
+}
+
+function formatQuizCard(record: Record<string, unknown>): Flashcard | null {
+  const question = stringField(record, 'question', 'q', 'prompt');
+  const options = parseOptions(record);
+  if (question.length === 0 && options.length === 0) return null;
+
+  const labeled = options.map((option, index) => `${optionLetter(index)}. ${option.text}`);
+  const front = [question, ...labeled].filter((part) => part.length > 0).join('\n');
+
+  const correct = options.flatMap((option, index) =>
+    option.correct ? [`${optionLetter(index)}. ${option.text}`] : [],
+  );
+  const rationale = stringField(record, 'rationale', 'explanation');
+  const back = [correct.join('\n'), rationale].filter((part) => part.length > 0).join('\n\n');
+
+  if (front.length === 0 && back.length === 0) return null;
+  return { front, back };
+}
+
+function quizItems(raw: unknown): unknown[] | null {
+  const root = asRecord(raw);
+  if (!root) return null;
+  if (Array.isArray(root.quiz)) return root.quiz;
+  if (Array.isArray(root.questions)) return root.questions;
+  return null;
+}
+
+function parseQuiz(items: unknown[]): Flashcard[] {
+  const cards: Flashcard[] = [];
+  for (const item of items) {
+    const record = asRecord(item);
+    if (!record) continue;
+    const card = formatQuizCard(record);
+    if (card) cards.push(card);
+  }
+  return cards;
+}
+
 export function parseAppData(raw: string): ExtractResult | null {
   const trimmed = raw.trim();
   if (!trimmed) return null;
@@ -55,15 +119,16 @@ export function parseAppData(raw: string): ExtractResult | null {
   }
 
   const cards = parseFlashcards(parsed);
-  if (cards.length === 0) {
-    const root = asRecord(parsed);
-    if (root && Array.isArray(root.quiz)) {
-      return { kind: 'quiz', cards: [], raw: parsed };
-    }
-    return { kind: 'unknown', cards: [], raw: parsed };
+  if (cards.length > 0) {
+    return { kind: 'flashcards', cards, raw: parsed };
   }
 
-  return { kind: 'flashcards', cards, raw: parsed };
+  const items = quizItems(parsed);
+  if (items) {
+    return { kind: 'quiz', cards: parseQuiz(items), raw: parsed };
+  }
+
+  return { kind: 'unknown', cards: [], raw: parsed };
 }
 
 export function readAppDataAttribute(
