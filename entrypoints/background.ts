@@ -1,4 +1,4 @@
-import { probeAndPost, shouldInjectFrame } from '../lib/frame-probe';
+import { probeAndPost, probeMindMapAndPost, shouldInjectFrame, shouldProbeMindMap } from '../lib/frame-probe';
 
 async function inject(tabId: number, frameId: number) {
   try {
@@ -11,9 +11,24 @@ async function inject(tabId: number, frameId: number) {
   }
 }
 
+async function injectMindMap(tabId: number, frameId: number) {
+  try {
+    await browser.scripting.executeScript({
+      target: { tabId, frameIds: [frameId] },
+      world: 'MAIN',
+      func: probeMindMapAndPost,
+    });
+  } catch (error) {
+    console.debug('[satchel] mindmap probe skipped', error);
+  }
+}
+
 async function scanTab(tabId: number) {
   const frames = await browser.webNavigation.getAllFrames({ tabId });
   for (const frame of frames ?? []) {
+    if (shouldProbeMindMap(frame.url)) {
+      await injectMindMap(tabId, frame.frameId);
+    }
     if (frame.frameId === 0) continue;
     await inject(tabId, frame.frameId);
   }
@@ -21,12 +36,18 @@ async function scanTab(tabId: number) {
 
 export default defineBackground(() => {
   browser.webNavigation.onCommitted.addListener((details) => {
+    if (shouldProbeMindMap(details.url)) {
+      void injectMindMap(details.tabId, details.frameId);
+    }
     if (details.frameId <= 0) return;
     if (!shouldInjectFrame(details.url)) return;
     void inject(details.tabId, details.frameId);
   });
 
   browser.webNavigation.onCompleted.addListener((details) => {
+    if (shouldProbeMindMap(details.url)) {
+      void injectMindMap(details.tabId, details.frameId);
+    }
     if (details.frameId <= 0) return;
     if (!shouldInjectFrame(details.url)) return;
     void inject(details.tabId, details.frameId);

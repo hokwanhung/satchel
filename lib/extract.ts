@@ -1,3 +1,4 @@
+import { parseMindMap } from './mindmap';
 import type { ExtractResult, Flashcard } from './types';
 
 function decodeEntities(value: string): string {
@@ -128,6 +129,11 @@ export function parseAppData(raw: string): ExtractResult | null {
     return { kind: 'quiz', cards: parseQuiz(items), raw: parsed };
   }
 
+  const mindMap = parseMindMap(parsed);
+  if (mindMap) {
+    return { kind: 'mindmap', cards: [], raw: parsed, mindMap };
+  }
+
   return { kind: 'unknown', cards: [], raw: parsed };
 }
 
@@ -150,7 +156,7 @@ export function extractFromDocument(doc: Document = document): ExtractResult | n
   const found = readAppDataAttribute(doc);
   if (!found) return null;
   const result = parseAppData(found.data);
-  if (result && (result.cards.length > 0 || result.kind === 'quiz')) {
+  if (result && (result.cards.length > 0 || result.kind === 'quiz' || result.kind === 'mindmap')) {
     return result;
   }
   return null;
