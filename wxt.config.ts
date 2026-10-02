@@ -10,8 +10,9 @@ export default defineConfig({
   srcDir: '.',
   manifest: {
     name: 'Satchel',
-    description: 'Pack NotebookLM flashcards and quizzes into Anki-ready CSV.',
-    version: '0.2.0',
+    description:
+      'Pack NotebookLM flashcards and quizzes into Anki-ready CSV, download reports as Word or Markdown, and save mind maps as HTML or SVG.',
+    version: '0.3.0',
     permissions: ['scripting', 'clipboardWrite', 'webNavigation', 'activeTab'],
     host_permissions: notebookHosts,
     action: {

@@ -1,8 +1,8 @@
 {
   "name": "satchel",
-  "description": "Pack NotebookLM flashcards and quizzes into Anki-ready CSV.",
+  "description": "Pack NotebookLM flashcards and quizzes into Anki-ready CSV, download reports as Word or Markdown, and save mind maps as HTML or SVG.",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -16,6 +16,7 @@
     "postinstall": "wxt prepare"
   },
   "devDependencies": {
+    "happy-dom": "^20.14.5",
     "typescript": "^5.9.3",
     "vite": "^8.1.5",
     "vitest": "^3.2.4",

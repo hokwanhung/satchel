@@ -1,7 +1,14 @@
 import { parseAppData, readAppDataAttribute, shouldHandleAppData } from '../lib/extract';
 import { isSatchelMessage } from '../lib/frame-probe';
-import { injectExportBar } from '../lib/inject-ui';
-import type { ExtractResult } from '../lib/types';
+import { injectExportBar, injectMindMapBar, injectReportBar } from '../lib/inject-ui';
+import { countMindMapNodes } from '../lib/mindmap';
+import { extractReport, type ReportDocument } from '../lib/report';
+import {
+  SATCHEL_MINDMAP_ROOT_ID,
+  SATCHEL_REPORT_ROOT_ID,
+  SATCHEL_ROOT_ID,
+  type ExtractResult,
+} from '../lib/types';
 
 const NOTEBOOK_MATCHES = [
   'https://notebooklm.google.com/*',
@@ -30,6 +37,7 @@ export default defineContentScript({
   main() {
     const view = window as SatchelWindow;
     let latest: ExtractResult | null = null;
+    let latestReport: ReportDocument | null = null;
     let lastRaw = view.__satchelLastRaw ?? '';
     let settleTimer: number | undefined;
     let dataNodeObserver: MutationObserver | null = null;
@@ -60,9 +68,18 @@ export default defineContentScript({
     };
 
     const applyResult = (parsed: ExtractResult) => {
+      if (parsed.kind === 'mindmap' && parsed.mindMap) {
+        latest = parsed;
+        if (window === window.top) {
+          document.getElementById(SATCHEL_ROOT_ID)?.remove();
+          injectMindMapBar(parsed.mindMap, document);
+        }
+        return;
+      }
       if (parsed.cards.length === 0) return;
       latest = parsed;
       if (window === window.top) {
+        document.getElementById(SATCHEL_MINDMAP_ROOT_ID)?.remove();
         injectExportBar(parsed.cards, document, parsed.kind);
       }
     };
@@ -71,7 +88,12 @@ export default defineContentScript({
       lastRaw = raw;
       view.__satchelLastRaw = raw;
       const parsed = parseAppData(raw);
-      if (!parsed?.cards.length) return;
+      if (!parsed) return;
+      if (parsed.kind === 'mindmap') {
+        if (!parsed.mindMap) return;
+      } else if (!parsed.cards.length) {
+        return;
+      }
 
       if (window === window.top) {
         applyResult(parsed);
@@ -81,7 +103,19 @@ export default defineContentScript({
       postToNotebookTop(raw);
     };
 
+    const scanReport = () => {
+      if (window !== window.top) return;
+      const report = extractReport(document);
+      latestReport = report;
+      if (!report) {
+        document.getElementById(SATCHEL_REPORT_ROOT_ID)?.remove();
+        return;
+      }
+      injectReportBar(report, document);
+    };
+
     const runScan = () => {
+      scanReport();
       const found = readAppDataAttribute(document);
       if (!found) {
         observeTree();
@@ -93,6 +127,7 @@ export default defineContentScript({
       }
 
       watchDataNode(found.node);
+      observeTree();
     };
 
     if (window === window.top) {
@@ -102,16 +137,21 @@ export default defineContentScript({
         lastRaw = event.data.data;
         view.__satchelLastRaw = lastRaw;
         const parsed = parseAppData(event.data.data);
-        if (parsed?.cards.length) applyResult(parsed);
+        if (parsed) applyResult(parsed);
       });
 
       browser.runtime.onMessage.addListener((message) => {
         if (!message || typeof message !== 'object' || !('type' in message)) return;
         if (message.type !== 'SATCHEL_GET_STATUS') return;
         return Promise.resolve({
-          count: latest?.cards.length ?? 0,
+          count:
+            latest?.kind === 'mindmap' && latest.mindMap
+              ? countMindMapNodes(latest.mindMap)
+              : (latest?.cards.length ?? 0),
           kind: latest?.kind,
           hasBar: Boolean(document.getElementById('satchel-export-root')),
+          reportTitle: latestReport?.title,
+          mindMapTitle: latest?.mindMap?.name,
         });
       });
     }

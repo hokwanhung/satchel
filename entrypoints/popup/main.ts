@@ -11,19 +11,28 @@ async function refreshStatus() {
   const onNotebook =
     tab.url.includes('notebook.google.com') || tab.url.includes('notebooklm.google.com');
   if (!onNotebook) {
-    if (status) status.textContent = 'Open NotebookLM, then generate flashcards or a quiz.';
+    if (status) {
+      status.textContent = 'Open NotebookLM, then generate flashcards, a quiz, a report, or a mind map.';
+    }
     return;
   }
 
   try {
     const result = (await browser.tabs.sendMessage(tab.id, {
       type: 'SATCHEL_GET_STATUS',
-    })) as { count?: number; kind?: string } | undefined;
+    })) as { count?: number; kind?: string; reportTitle?: string; mindMapTitle?: string } | undefined;
     if (status) {
-      const noun = result?.kind === 'quiz' ? 'questions' : 'cards';
-      status.textContent = result?.count
-        ? `${result.count} ${noun} ready in this notebook.`
-        : 'Nothing detected yet. Open the Studio flashcard or quiz viewer.';
+      const parts: string[] = [];
+      if (result?.reportTitle) parts.push(`Report ready: ${result.reportTitle}.`);
+      if (result?.mindMapTitle) parts.push(`Mind map ready: ${result.mindMapTitle}.`);
+      if (result?.count) {
+        const noun =
+          result.kind === 'quiz' ? 'questions' : result.kind === 'mindmap' ? 'nodes' : 'cards';
+        parts.push(`${result.count} ${noun} ready in this notebook.`);
+      }
+      status.textContent =
+        parts.join(' ') ||
+        'Nothing detected yet. Open a Studio report, mind map, flashcards, or a quiz.';
     }
   } catch {
     if (status) status.textContent = 'Reload the NotebookLM tab after installing Satchel.';
